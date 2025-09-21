@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Fetch idea to verify workspace and access
     const existing = await prisma.idea.findUnique({
       where: { id: validatedParams.id, deletedAt: null },
-      select: { workspaceId: true, impact: true, confidence: true, effort: true }
+      select: { workspaceId: true, impact: true, confidence: true, effort: true, status: true }
     });
 
     if (!existing) {
@@ -91,6 +91,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const validatedData = updateIdeaSchema.parse(body);
 
     const payload: any = { ...validatedData };
+
+    // Validate status transition if status is being updated
+    if (validatedData.status) {
+      const from = existing.status as any;
+      const to = validatedData.status as any;
+      const allowed: Record<string, string[]> = {
+        PENDING: ["VALIDATING", "ARCHIVED"],
+        VALIDATING: ["VALIDATED", "ARCHIVED"],
+        VALIDATED: ["ARCHIVED"],
+        ARCHIVED: [],
+      };
+      const ok = (allowed[from] ?? []).includes(to);
+      if (!ok) {
+        return NextResponse.json({ error: `Invalid status transition from ${from} to ${to}` }, { status: 400 });
+      }
+    }
 
     // Recalculate ICE score if any component changed
     if (validatedData.impact || validatedData.confidence || validatedData.effort) {

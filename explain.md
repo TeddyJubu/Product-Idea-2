@@ -21,6 +21,49 @@ Tests:
 Tests:
 - Added tests/idea-table.view-details.test.tsx → clicking "View Details" in row menu calls onIdeaClick (used by navigation)
 - All tests passing
+## What I did (Validation tasks API + UI)
+
+- API: Added /api/ideas/[id]/tasks (GET, POST) and /api/tasks/[taskId] (PATCH, DELETE) with membership checks
+- UI: New IdeaTasksSection on idea detail: add tasks, toggle DONE, and see progress bar
+- Why: Enables structured validation workflow and visible progress
+
+Tests:
+- Added API tests for list/create/update/delete
+- Added component test to create a task and mark it DONE
+
+## What I did (Evidence API + UI)
+
+- API: Added /api/ideas/[id]/evidence (GET, POST) and /api/evidence/[evidenceId] (PATCH, DELETE)
+- UI: New IdeaEvidenceSection to add and list evidence (title + URL)
+- Why: Capture and display validation signals in one place
+
+Tests:
+- Added API tests for list/create/update/delete
+- Added component test to add evidence and see it listed
+
+## What I did (Validation workflow + transitions)
+
+- Server: Enforced allowed status transitions in PATCH /api/ideas/[id]
+  - PENDING → VALIDATING/ARCHIVED; VALIDATING → VALIDATED/ARCHIVED; VALIDATED → ARCHIVED
+- Why: Ensures consistent lifecycle for ideas
+
+Tests:
+- Added tests to allow PENDING→VALIDATING and block PENDING→VALIDATED
+
+## What I did (Confidence suggestions)
+
+- API: Added /api/ideas/[id]/suggestions to compute suggestedConfidence from DONE tasks and evidence count
+- Why: Gives a data-backed nudge to adjust confidence as validation progresses
+
+Tests:
+- Added test expecting confidence increase with tasks and evidence
+
+## What I did (Progress indicators & checklist)
+
+- UI: Checklist for tasks with toggles and a progress bar in IdeaTasksSection
+- Why: Clear visual indicator of how far validation has progressed
+
+
 
 
 

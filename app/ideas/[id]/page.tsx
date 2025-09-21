@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { IdeaTasksSection } from "@/components/idea-tasks-section";
+import { IdeaEvidenceSection } from "@/components/idea-evidence-section";
 
 export default async function IdeaDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -79,16 +81,16 @@ export default async function IdeaDetailPage({ params }: { params: { id: string 
           </div>
         </section>
 
-        {/* Validation (placeholder) */}
+        {/* Validation */}
         <section id="validation" className="space-y-2">
           <h2 className="text-xl font-semibold">Validation</h2>
-          <p className="text-muted-foreground">{idea!._count.tasks} tasks. UI coming soon.</p>
+          <IdeaTasksSection ideaId={idea!.id} />
         </section>
 
-        {/* Evidence (placeholder) */}
+        {/* Evidence */}
         <section id="evidence" className="space-y-2">
           <h2 className="text-xl font-semibold">Evidence</h2>
-          <p className="text-muted-foreground">{idea!._count.evidences} items. UI coming soon.</p>
+          <IdeaEvidenceSection ideaId={idea!.id} />
         </section>
 
         {/* Comments (placeholder) */}
