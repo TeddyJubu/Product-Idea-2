@@ -14,9 +14,11 @@ import { useWorkspace } from "@/contexts/workspace-context";
 import { useToast } from "@/hooks/use-toast";
 import { User, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Page() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const {
     selectedWorkspace,
     workspaces,
@@ -53,13 +55,8 @@ export default function Page() {
   }, [toast]);
 
   const handleIdeaClick = useCallback((idea: any) => {
-    // TODO: Navigate to idea detail page
-    console.log("Clicked idea:", idea);
-    toast({
-      title: "Coming soon",
-      description: "Idea detail page will be available soon!",
-    });
-  }, [toast]);
+    router.push(`/ideas/${idea.id}`);
+  }, [router]);
 
   // Loading state
   if (status === "loading" || isLoadingWorkspace) {

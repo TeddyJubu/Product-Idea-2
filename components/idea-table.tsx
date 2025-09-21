@@ -22,6 +22,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   AlertTriangle,
   RefreshCw,
   ArrowUpDown,
@@ -83,6 +91,8 @@ export function IdeaTable({
   const [sortField, setSortField] = useState<SortField>('iceScore');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<Idea | null>(null);
 
   const { toast } = useToast();
   const { canDeleteIdeas } = useWorkspacePermissions();
@@ -173,6 +183,7 @@ export function IdeaTable({
       }
 
       setIdeas(ideas.filter(i => i.id !== idea.id));
+      onIdeaDelete?.(idea);
       toast({
         title: "Success",
         description: "Idea deleted successfully",
@@ -502,7 +513,8 @@ export function IdeaTable({
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(idea);
+                          setToDelete(idea);
+                          setConfirmOpen(true);
                         }}
                         className="text-red-600"
                         disabled={deletingId === idea.id}
@@ -517,6 +529,32 @@ export function IdeaTable({
             </TableRow>
           ))}
         </TableBody>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete idea?</DialogTitle>
+            <DialogDescription>
+              This will soft-delete the idea. You can restore it later from the database by clearing deletedAt.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (toDelete) {
+                  await handleDelete(toDelete);
+                  setToDelete(null);
+                  setConfirmOpen(false);
+                }
+              }}
+              disabled={!!deletingId}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </Table>
     </div>
   );
