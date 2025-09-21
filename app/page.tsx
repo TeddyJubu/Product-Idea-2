@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useWorkspace } from "@/contexts/workspace-context";
 import { useToast } from "@/hooks/use-toast";
 import { User, LogOut } from "lucide-react";
+import Link from "next/link";
 
 export default function Page() {
   const { data: session, status } = useSession();
@@ -87,9 +88,16 @@ export default function Page() {
                 Sign in to start capturing and validating your ideas
               </p>
             </div>
-            <Button onClick={() => signIn()} className="w-full">
-              Sign In
-            </Button>
+            <div className="space-y-3">
+              <Button onClick={() => signIn()} className="w-full">
+                Sign In
+              </Button>
+              <Link href="/demo">
+                <Button variant="outline" className="w-full">
+                  Try Demo Mode
+                </Button>
+              </Link>
+            </div>
           </div>
         </Card>
       </div>
