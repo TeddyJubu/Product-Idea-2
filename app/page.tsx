@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { IdeaForm } from "@/components/idea-form";
 import { IdeaTable } from "@/components/idea-table";
+import { IdeaEditDialog } from "@/components/idea-edit-dialog";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { WorkspaceSelector } from "@/components/workspace-selector";
 import { AppHeader } from "@/components/app-header";
@@ -22,11 +23,23 @@ export default function Page() {
     isLoadingWorkspaces
   } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
 
   // Refresh ideas when workspace changes
   const handleWorkspaceChange = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
+
+  // Handle idea actions
+  const handleIdeaEdit = useCallback((idea: any) => {
+    setEditingIdea(idea);
+    setEditDialogOpen(true);
+  }, []);
+
+  const handleEditSuccess = useCallback(() => {
     setRefreshKey(prev => prev + 1);
   }, []);
 
@@ -134,6 +147,9 @@ export default function Page() {
               key={refreshKey}
               workspaceId={selectedWorkspace.id}
               onIdeaClick={handleIdeaClick}
+              onIdeaEdit={handleIdeaEdit}
+              onIdeaDelete={() => setRefreshKey(prev => prev + 1)}
+              onIdeaDuplicate={() => setRefreshKey(prev => prev + 1)}
             />
           </Card>
 
@@ -142,6 +158,13 @@ export default function Page() {
             onOpenChange={setOpen}
             workspaceId={selectedWorkspace.id}
             onSuccess={handleIdeaCreated}
+          />
+
+          <IdeaEditDialog
+            idea={editingIdea}
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            onSuccess={handleEditSuccess}
           />
         </main>
       </div>

@@ -1,11 +1,44 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertTriangle,
+  RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  MoreHorizontal,
+  Edit,
+  Copy,
+  Trash2,
+  Eye,
+  Calendar,
+  MessageSquare,
+  CheckSquare,
+  FileText
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useWorkspacePermissions } from "@/contexts/workspace-context";
 
 interface Idea {
   id: string;
@@ -26,15 +59,33 @@ interface Idea {
   updatedAt: string;
 }
 
+type SortField = 'title' | 'impact' | 'confidence' | 'effort' | 'iceScore' | 'status' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
+
 interface IdeaTableProps {
   workspaceId: string;
   onIdeaClick?: (idea: Idea) => void;
+  onIdeaEdit?: (idea: Idea) => void;
+  onIdeaDelete?: (idea: Idea) => void;
+  onIdeaDuplicate?: (idea: Idea) => void;
 }
 
-export function IdeaTable({ workspaceId, onIdeaClick }: IdeaTableProps) {
+export function IdeaTable({
+  workspaceId,
+  onIdeaClick,
+  onIdeaEdit,
+  onIdeaDelete,
+  onIdeaDuplicate
+}: IdeaTableProps) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>('iceScore');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { toast } = useToast();
+  const { canDeleteIdeas } = useWorkspacePermissions();
 
   const fetchIdeas = async () => {
     try {
@@ -62,29 +113,169 @@ export function IdeaTable({ workspaceId, onIdeaClick }: IdeaTableProps) {
     }
   }, [workspaceId]);
 
+  // Sorting logic
+  const sortedIdeas = useMemo(() => {
+    const sorted = [...ideas].sort((a, b) => {
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
+
+      // Handle special cases
+      if (sortField === 'createdAt') {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      } else if (sortField === 'title') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [ideas, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'iceScore' ? 'desc' : 'asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4" />;
+    return sortDirection === 'asc' ?
+      <ArrowUp className="h-4 w-4" /> :
+      <ArrowDown className="h-4 w-4" />;
+  };
+
+  // Action handlers
+  const handleDelete = async (idea: Idea) => {
+    if (!canDeleteIdeas) {
+      toast({
+        title: "Permission denied",
+        description: "You don't have permission to delete ideas",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDeletingId(idea.id);
+    try {
+      const response = await fetch(`/api/ideas/${idea.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete idea');
+      }
+
+      setIdeas(ideas.filter(i => i.id !== idea.id));
+      toast({
+        title: "Success",
+        description: "Idea deleted successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete idea",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleDuplicate = async (idea: Idea) => {
+    try {
+      const response = await fetch('/api/ideas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${idea.title} (Copy)`,
+          description: idea.description,
+          impact: idea.impact,
+          confidence: idea.confidence,
+          effort: idea.effort,
+          workspaceId: workspaceId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to duplicate idea');
+      }
+
+      await fetchIdeas(); // Refresh the list
+      toast({
+        title: "Success",
+        description: "Idea duplicated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to duplicate idea",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusColor = (status: Idea["status"]) => {
     switch (status) {
       case "PENDING": return "secondary";
       case "VALIDATING": return "default";
       case "VALIDATED": return "default";
-      case "ARCHIVED": return "secondary";
+      case "ARCHIVED": return "outline";
       default: return "secondary";
     }
   };
 
+  const getStatusIcon = (status: Idea["status"]) => {
+    switch (status) {
+      case "PENDING": return <Calendar className="h-3 w-3" />;
+      case "VALIDATING": return <Eye className="h-3 w-3" />;
+      case "VALIDATED": return <CheckSquare className="h-3 w-3" />;
+      case "ARCHIVED": return <FileText className="h-3 w-3" />;
+      default: return <Calendar className="h-3 w-3" />;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const getIceScoreColor = (score: number) => {
+    if (score >= 7) return "text-green-600 font-semibold";
+    if (score >= 5) return "text-yellow-600 font-semibold";
+    if (score >= 3) return "text-orange-600 font-semibold";
+    return "text-red-600 font-semibold";
+  };
+
   if (loading) {
     return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-4">
+      <div className="rounded-md border">
+        <div className="flex items-center gap-2 p-4 border-b">
           <Spinner size="sm" />
           <span className="text-sm text-muted-foreground">Loading ideas...</span>
         </div>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        ))}
+        <div className="p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center space-x-4">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -106,57 +297,227 @@ export function IdeaTable({ workspaceId, onIdeaClick }: IdeaTableProps) {
 
   if (ideas.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        <p>No ideas yet. Create your first idea to get started!</p>
+      <div className="rounded-md border">
+        <div className="text-center py-12 text-muted-foreground">
+          <div className="flex flex-col items-center space-y-2">
+            <FileText className="h-12 w-12 text-muted-foreground/50" />
+            <p className="text-lg font-medium">No ideas yet</p>
+            <p className="text-sm">Create your first idea to get started!</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-left border-b">
-          <tr>
-            <th className="pb-2 font-medium">Title</th>
-            <th className="pb-2 font-medium">Impact</th>
-            <th className="pb-2 font-medium">Conf.</th>
-            <th className="pb-2 font-medium">Effort</th>
-            <th className="pb-2 font-medium">ICE</th>
-            <th className="pb-2 font-medium">Status</th>
-            <th className="pb-2 font-medium">Progress</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ideas.map((idea) => (
-            <tr
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[300px]">
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('title')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                Title
+                {getSortIcon('title')}
+              </Button>
+            </TableHead>
+            <TableHead className="text-center">
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('impact')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                Impact
+                {getSortIcon('impact')}
+              </Button>
+            </TableHead>
+            <TableHead className="text-center">
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('confidence')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                Confidence
+                {getSortIcon('confidence')}
+              </Button>
+            </TableHead>
+            <TableHead className="text-center">
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('effort')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                Effort
+                {getSortIcon('effort')}
+              </Button>
+            </TableHead>
+            <TableHead className="text-center">
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('iceScore')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                ICE Score
+                {getSortIcon('iceScore')}
+              </Button>
+            </TableHead>
+            <TableHead>
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('status')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                Status
+                {getSortIcon('status')}
+              </Button>
+            </TableHead>
+            <TableHead>Progress</TableHead>
+            <TableHead>
+              <Button
+                variant="ghost"
+                onClick={() => handleSort('createdAt')}
+                className="h-auto p-0 font-medium hover:bg-transparent"
+              >
+                Created
+                {getSortIcon('createdAt')}
+              </Button>
+            </TableHead>
+            <TableHead className="w-[50px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedIdeas.map((idea) => (
+            <TableRow
               key={idea.id}
-              className="border-t hover:bg-muted/50 cursor-pointer transition-colors"
+              className="cursor-pointer hover:bg-muted/50"
               onClick={() => onIdeaClick?.(idea)}
             >
-              <td className="py-3">
-                <div>
-                  <div className="font-medium">{idea.title}</div>
-                  <div className="text-xs text-muted-foreground line-clamp-1">
+              <TableCell>
+                <div className="space-y-1">
+                  <div className="font-medium leading-none">{idea.title}</div>
+                  <div className="text-sm text-muted-foreground line-clamp-2">
                     {idea.description}
                   </div>
                 </div>
-              </td>
-              <td className="py-3">{idea.impact}</td>
-              <td className="py-3">{idea.confidence}</td>
-              <td className="py-3">{idea.effort}</td>
-              <td className="py-3 font-medium">{idea.iceScore.toFixed(2)}</td>
-              <td className="py-3">
-                <Badge variant={getStatusColor(idea.status)}>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-medium text-blue-700">
+                    {idea.impact}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm font-medium text-green-700">
+                    {idea.confidence}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-sm font-medium text-orange-700">
+                    {idea.effort}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className={`text-lg font-bold ${getIceScoreColor(idea.iceScore)}`}>
+                  {idea.iceScore.toFixed(1)}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant={getStatusColor(idea.status)} className="flex items-center gap-1">
+                  {getStatusIcon(idea.status)}
                   {idea.status}
                 </Badge>
-              </td>
-              <td className="py-3 text-xs text-muted-foreground">
-                {idea._count.tasks}T • {idea._count.evidences}E • {idea._count.comments}C
-              </td>
-            </tr>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center space-x-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <CheckSquare className="h-3 w-3" />
+                    {idea._count.tasks}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {idea._count.evidences}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="h-3 w-3" />
+                    {idea._count.comments}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {formatDate(idea.createdAt)}
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIdeaClick?.(idea);
+                      }}
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      View Details
+                    </DropdownMenuItem>
+                    {onIdeaEdit && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onIdeaEdit(idea);
+                        }}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDuplicate(idea);
+                      }}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {canDeleteIdeas && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(idea);
+                        }}
+                        className="text-red-600"
+                        disabled={deletingId === idea.id}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {deletingId === idea.id ? 'Deleting...' : 'Delete'}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
