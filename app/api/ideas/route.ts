@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ice } from "@/lib/utils";
 import { ideaQuerySchema, createIdeaSchema } from "@/lib/validators";
@@ -6,8 +8,28 @@ import { ZodError } from "zod";
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user || !(session.user as any).id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = (session.user as any).id;
+
     const searchParams = Object.fromEntries(req.nextUrl.searchParams.entries());
     const validatedQuery = ideaQuerySchema.parse(searchParams);
+
+    // Verify user has access to the workspace
+    const membership = await prisma.membership.findFirst({
+      where: {
+        userId: userId,
+        workspaceId: validatedQuery.ws
+      }
+    });
+
+    if (!membership) {
+      return NextResponse.json({ error: "Access denied to workspace" }, { status: 403 });
+    }
 
     const ideas = await prisma.idea.findMany({
       where: {
@@ -60,8 +82,28 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user || !(session.user as any).id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = (session.user as any).id;
+
     const body = await req.json();
     const validatedData = createIdeaSchema.parse(body);
+
+    // Verify user has access to the workspace
+    const membership = await prisma.membership.findFirst({
+      where: {
+        userId: userId,
+        workspaceId: validatedData.workspaceId
+      }
+    });
+
+    if (!membership) {
+      return NextResponse.json({ error: "Access denied to workspace" }, { status: 403 });
+    }
 
     const iceScore = ice(validatedData.impact, validatedData.confidence, validatedData.effort);
 

@@ -1,7 +1,9 @@
-import NextAuth, { type NextAuthOptions } from "next-auth";
+import NextAuth, { type NextAuthOptions, type User } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/db";
+import type { JWT } from "next-auth/jwt";
+import type { Session } from "next-auth";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -15,7 +17,45 @@ export const authOptions: NextAuthOptions = {
       },
       from: process.env.EMAIL_FROM
     })
-  ]
+  ],
+  callbacks: {
+    async jwt({ token, user }: { token: JWT; user?: User }) {
+      if (user) {
+        token.userId = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }: { session: Session; token: JWT }) {
+      if (token.userId && session.user) {
+        (session.user as any).id = token.userId as string;
+
+        // Get user's workspaces
+        const userWithWorkspaces = await prisma.user.findUnique({
+          where: { id: token.userId as string },
+          include: {
+            memberships: {
+              include: {
+                workspace: true
+              }
+            }
+          }
+        });
+
+        if (userWithWorkspaces) {
+          (session.user as any).workspaces = userWithWorkspaces.memberships.map(membership => ({
+            id: membership.workspace.id,
+            name: membership.workspace.name,
+            role: membership.role
+          }));
+        }
+      }
+      return session;
+    }
+  },
+  pages: {
+    signIn: '/auth/signin',
+    verifyRequest: '/auth/verify-request',
+  }
 };
 
 export default NextAuth(authOptions);
