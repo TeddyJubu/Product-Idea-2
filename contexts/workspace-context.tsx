@@ -1,7 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { useSession } from "next-auth/react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 export interface Workspace {
@@ -41,7 +40,6 @@ interface WorkspaceProviderProps {
 }
 
 export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
-  const { data: session, status } = useSession();
   const { toast } = useToast();
   
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -49,10 +47,14 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Keep a ref of current selection to avoid re-creating callbacks/effects
+  const selectedWorkspaceRef = useRef<Workspace | null>(null);
+  useEffect(() => {
+    selectedWorkspaceRef.current = selectedWorkspace;
+  }, [selectedWorkspace]);
+
   // Load workspaces from API
   const loadWorkspaces = useCallback(async () => {
-    if (!session?.user) return;
-    
     setIsLoadingWorkspaces(true);
     try {
       const response = await fetch("/api/workspaces");
@@ -72,10 +74,42 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           }
         }
         
-        // Auto-select first workspace if none selected and no saved preference
-        if (!savedWorkspaceId && data.length > 0 && !selectedWorkspace) {
-          setSelectedWorkspace(data[0]);
-          localStorage.setItem(WORKSPACE_STORAGE_KEY, data[0].id);
+        // Auto-select or auto-create workspace if none selected and no saved preference
+        if (!savedWorkspaceId && !selectedWorkspace) {
+          if (data.length > 0) {
+            setSelectedWorkspace(data[0]);
+            localStorage.setItem(WORKSPACE_STORAGE_KEY, data[0].id);
+          } else {
+            // No workspaces exist - create a default one and select it
+            try {
+              const createResp = await fetch("/api/workspaces", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: "Default Workspace" }),
+              });
+              if (createResp.ok) {
+                const ws = await createResp.json();
+                setWorkspaces([ws]);
+                setSelectedWorkspace(ws);
+                localStorage.setItem(WORKSPACE_STORAGE_KEY, ws.id);
+              } else {
+                const err = await createResp.json().catch(() => ({}));
+                console.error("Auto-create workspace failed:", err);
+                toast({
+                  title: "Workspace",
+                  description: "Could not auto-create default workspace",
+                  variant: "destructive",
+                });
+              }
+            } catch (err) {
+              console.error("Auto-create workspace error:", err);
+              toast({
+                title: "Workspace",
+                description: "Could not auto-create default workspace",
+                variant: "destructive",
+              });
+            }
+          }
         }
       } else {
         toast({
@@ -95,20 +129,12 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       setIsLoadingWorkspaces(false);
       setIsLoading(false);
     }
-  }, [session, toast, selectedWorkspace]);
+  }, [toast]);
 
-  // Load workspaces when user is authenticated
+  // Load workspaces on mount
   useEffect(() => {
-    if (session?.user && status === "authenticated") {
-      loadWorkspaces();
-    } else if (status === "unauthenticated") {
-      // Clear workspace data when user logs out
-      setWorkspaces([]);
-      setSelectedWorkspace(null);
-      localStorage.removeItem(WORKSPACE_STORAGE_KEY);
-      setIsLoading(false);
-    }
-  }, [session, status, loadWorkspaces]);
+    loadWorkspaces();
+  }, [loadWorkspaces]);
 
   // Select workspace and persist to localStorage
   const selectWorkspace = useCallback((workspace: Workspace) => {

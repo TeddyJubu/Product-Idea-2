@@ -1,5 +1,13 @@
-import NextAuth from "@/lib/auth";
+export async function GET() {
+  return new Response(JSON.stringify({ error: "Authentication disabled" }), {
+    status: 404,
+    headers: { "content-type": "application/json" },
+  });
+}
 
-const handler = NextAuth;
-
-export { handler as GET, handler as POST };
+export async function POST() {
+  return new Response(JSON.stringify({ error: "Authentication disabled" }), {
+    status: 404,
+    headers: { "content-type": "application/json" },
+  });
+}

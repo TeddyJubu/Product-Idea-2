@@ -3,8 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { useWorkspace } from "@/contexts/workspace-context";
-import { signOut } from "next-auth/react";
-import { LogOut, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 interface AppHeaderProps {
   title?: string;
@@ -46,14 +45,6 @@ export function AppHeader({
               </Button>
             )}
             
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => signOut()}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>

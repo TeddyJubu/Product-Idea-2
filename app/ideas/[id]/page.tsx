@@ -1,7 +1,5 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,10 +8,6 @@ import { IdeaTasksSection } from "@/components/idea-tasks-section";
 import { IdeaEvidenceSection } from "@/components/idea-evidence-section";
 
 export default async function IdeaDetailPage({ params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !(session.user as any).id) {
-    redirect("/");
-  }
 
   const idea = await prisma.idea.findUnique({
     where: { id: params.id, deletedAt: null },
@@ -30,13 +24,6 @@ export default async function IdeaDetailPage({ params }: { params: { id: string 
     notFound();
   }
 
-  const userId = (session!.user as any).id as string;
-  const membership = await prisma.membership.findFirst({
-    where: { userId, workspaceId: idea!.workspaceId },
-  });
-  if (!membership) {
-    notFound();
-  }
 
   return (
     <div className="min-h-screen bg-background">

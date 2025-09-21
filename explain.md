@@ -160,3 +160,20 @@ If anything fails, I’ll fix the tests or code and re-run until everything is g
   - Result: 3 passed (Chromium, Firefox, WebKit)
 
 Beginner note: E2E tests launch a real browser, open your app, click buttons/links, and assert what the user would see. If the app fails to build, Playwright reports it early—which helped us find and fix a couple of small mismatches (like Evidence fields) before the tests ran.
+
+## What I did (Investigate sign-in email failure)
+
+- Looked for where sign-in emails are sent. Found NextAuth EmailProvider configured in lib/auth.ts.
+- It uses SMTP via env vars: EMAIL_SERVER_HOST/PORT/USER/PASSWORD and EMAIL_FROM.
+- In the UI (app/auth/signin/page.tsx), the generic error message shows when NextAuth returns an error after signIn("email").
+- Likely causes:
+  - nodemailer not installed (EmailProvider depends on it as a peer dep).
+  - Missing/incorrect EMAIL_* env variables (wrong host/port/user/pass/from).
+
+Next steps I propose:
+- Install nodemailer (needed by NextAuth EmailProvider).
+- Set .env with real SMTP creds (e.g., Mailtrap for dev, or Resend/SendGrid/Postmark).
+- Restart dev server and try again; check server logs if it still fails.
+
+Beginner note:
+- NextAuth’s EmailProvider sends a “magic link” using SMTP. It needs nodemailer (a library that talks SMTP) and correct credentials. If either is missing or wrong, sending fails and the page shows a generic error.

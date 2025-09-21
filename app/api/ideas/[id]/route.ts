@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ice } from "@/lib/utils";
 import { updateIdeaSchema, idParamSchema } from "@/lib/validators";
@@ -8,10 +6,6 @@ import { ZodError } from "zod";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string }}) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !(session.user as any).id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const validatedParams = idParamSchema.parse(params);
 
@@ -36,13 +30,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ error: "Idea not found" }, { status: 404 });
     }
 
-    const userId = (session.user as any).id;
-    const membership = await prisma.membership.findFirst({
-      where: { userId, workspaceId: (idea as any).workspaceId }
-    });
-    if (!membership) {
-      return NextResponse.json({ error: "Access denied to workspace" }, { status: 403 });
-    }
 
     return NextResponse.json({ idea });
   } catch (error) {
@@ -62,10 +49,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string }}) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !(session.user as any).id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const validatedParams = idParamSchema.parse(params);
 
@@ -79,13 +62,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ error: "Idea not found" }, { status: 404 });
     }
 
-    const userId = (session.user as any).id;
-    const membership = await prisma.membership.findFirst({
-      where: { userId, workspaceId: existing.workspaceId }
-    });
-    if (!membership) {
-      return NextResponse.json({ error: "Access denied to workspace" }, { status: 403 });
-    }
 
     const body = await req.json();
     const validatedData = updateIdeaSchema.parse(body);
@@ -140,10 +116,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string }}) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || !(session.user as any).id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const validatedParams = idParamSchema.parse(params);
 
@@ -156,13 +128,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
       return NextResponse.json({ error: "Idea not found" }, { status: 404 });
     }
 
-    const userId = (session.user as any).id;
-    const membership = await prisma.membership.findFirst({
-      where: { userId, workspaceId: existing.workspaceId }
-    });
-    if (!membership) {
-      return NextResponse.json({ error: "Access denied to workspace" }, { status: 403 });
-    }
 
     const idea = await prisma.idea.update({
       where: { id: validatedParams.id, deletedAt: null },
