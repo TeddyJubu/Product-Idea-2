@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  name          String?
+  image         String?
+  memberships   Membership[]
+  comments      Comment[]
+  activities    Activity[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Workspace {
+  id           String        @id @default(cuid())
+  name         String
+  memberships  Membership[]
+  ideas        Idea[]
+  tags         Tag[]
+  activities   Activity[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Membership {
+  id           String     @id @default(cuid())
+  userId       String
+  workspaceId  String
+  role         Role       @default(MEMBER)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+enum Role { OWNER ADMIN MEMBER }
+
+model Idea {
+  id            String      @id @default(cuid())
+  workspaceId   String
+  title         String
+  description   String      @db.Text
+  impact        Int
+  confidence    Int
+  effort        Int
+  iceScore      Float
+  status        IdeaStatus  @default(PENDING)
+  tags          IdeaTag[]
+  tasks         ValidationTask[]
+  evidences     Evidence[]
+  comments      Comment[]
+  createdById   String
+  createdBy     User        @relation(fields: [createdById], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  deletedAt     DateTime?
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+enum IdeaStatus { PENDING VALIDATING VALIDATED ARCHIVED }
+
+model Tag {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  ideas       IdeaTag[]
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+}
+
+model IdeaTag {
+  ideaId String
+  tagId  String
+  idea   Idea   @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([ideaId, tagId])
+}
+
+model ValidationTask {
+  id        String     @id @default(cuid())
+  ideaId    String
+  title     String
+  kind      TaskKind
+  status    TaskStatus @default(TODO)
+  notes     String?    @db.Text
+  weight    Int        @default(1)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  idea      Idea       @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+}
+
+enum TaskKind { INTERVIEW SMOKE_TEST MARKET_RESEARCH PROTOTYPE OTHER }
+enum TaskStatus { TODO DOING DONE SKIPPED }
+
+model Evidence {
+  id        String   @id @default(cuid())
+  ideaId    String
+  title     String
+  summary   String?  @db.Text
+  url       String?
+  createdAt DateTime @default(now())
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  ideaId    String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  workspaceId String
+  actorId     String?
+  kind        String
+  meta        Json
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor       User?    @relation(fields: [actorId], references: [id])
+}
