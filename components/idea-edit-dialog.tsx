@@ -83,7 +83,7 @@ export function IdeaEditDialog({ idea, open, onOpenChange, onSuccess }: IdeaEdit
     setIsSubmitting(true);
     try {
       const response = await fetch(`/api/ideas/${idea.id}`, {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
