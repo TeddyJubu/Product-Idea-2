@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,68 +7,27 @@ import { IdeaForm } from "@/components/idea-form";
 import { IdeaTable } from "@/components/idea-table";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { WorkspaceSelector } from "@/components/workspace-selector";
+import { AppHeader } from "@/components/app-header";
 import { Spinner } from "@/components/ui/spinner";
+import { useWorkspace } from "@/contexts/workspace-context";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, LogOut, User } from "lucide-react";
-
-interface Workspace {
-  id: string;
-  name: string;
-  role: string;
-}
+import { User, LogOut } from "lucide-react";
 
 export default function Page() {
   const { data: session, status } = useSession();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<Workspace | null>(null);
+  const {
+    selectedWorkspace,
+    workspaces,
+    isLoading: isLoadingWorkspace,
+    isLoadingWorkspaces
+  } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const { toast } = useToast();
 
-  // Load workspaces when user is authenticated
-  useEffect(() => {
-    if (session?.user && status === "authenticated") {
-      loadWorkspaces();
-    }
-  }, [session, status]);
-
-  const loadWorkspaces = async () => {
-    setIsLoadingWorkspaces(true);
-    try {
-      const response = await fetch("/api/workspaces");
-      if (response.ok) {
-        const data = await response.json();
-        setWorkspaces(data);
-        // Auto-select first workspace if none selected
-        if (data.length > 0 && !selectedWorkspace) {
-          setSelectedWorkspace(data[0]);
-        }
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load workspaces",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load workspaces",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingWorkspaces(false);
-    }
-  };
-
-  const handleWorkspaceSelect = useCallback((workspace: Workspace) => {
-    setSelectedWorkspace(workspace);
-    setRefreshKey(prev => prev + 1); // Refresh ideas when workspace changes
-  }, []);
-
-  const handleWorkspaceCreated = useCallback(() => {
-    loadWorkspaces();
+  // Refresh ideas when workspace changes
+  const handleWorkspaceChange = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
   }, []);
 
   const handleIdeaCreated = useCallback(() => {
@@ -89,7 +48,7 @@ export default function Page() {
   }, [toast]);
 
   // Loading state
-  if (status === "loading") {
+  if (status === "loading" || isLoadingWorkspace) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -146,8 +105,8 @@ export default function Page() {
               <WorkspaceSelector
                 workspaces={workspaces}
                 selectedWorkspace={selectedWorkspace}
-                onWorkspaceSelect={handleWorkspaceSelect}
-                onWorkspaceCreated={handleWorkspaceCreated}
+                onWorkspaceSelect={handleWorkspaceChange}
+                onWorkspaceCreated={handleWorkspaceChange}
               />
             )}
 
@@ -166,51 +125,26 @@ export default function Page() {
   // Main application with workspace selected
   return (
     <ErrorBoundary>
-      <main className="mx-auto max-w-6xl p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Ideas</h1>
-            <p className="text-muted-foreground">
-              {selectedWorkspace.name} • Capture, prioritize, and validate your ideas with ICE scoring
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedWorkspace(null)}
-            >
-              Switch Workspace
-            </Button>
-            <Button onClick={() => setOpen(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              New Idea
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => signOut()}
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      <div className="min-h-screen bg-background">
+        <AppHeader onNewIdea={() => setOpen(true)} />
 
-        <Card className="p-6">
-          <IdeaTable
-            key={refreshKey}
+        <main className="mx-auto max-w-6xl p-6">
+          <Card className="p-6">
+            <IdeaTable
+              key={refreshKey}
+              workspaceId={selectedWorkspace.id}
+              onIdeaClick={handleIdeaClick}
+            />
+          </Card>
+
+          <IdeaForm
+            open={open}
+            onOpenChange={setOpen}
             workspaceId={selectedWorkspace.id}
-            onIdeaClick={handleIdeaClick}
+            onSuccess={handleIdeaCreated}
           />
-        </Card>
-
-        <IdeaForm
-          open={open}
-          onOpenChange={setOpen}
-          workspaceId={selectedWorkspace.id}
-          onSuccess={handleIdeaCreated}
-        />
-      </main>
+        </main>
+      </div>
     </ErrorBoundary>
   );
 }
