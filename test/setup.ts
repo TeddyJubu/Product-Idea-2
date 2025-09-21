@@ -6,6 +6,5 @@ class RO {
   unobserve() {}
   disconnect() {}
 }
-// @ts-expect-error: assign to global for tests
-global.ResizeObserver = global.ResizeObserver || RO as any;
+(globalThis as any).ResizeObserver = (globalThis as any).ResizeObserver || (RO as any);
 

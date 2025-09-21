@@ -135,3 +135,28 @@ Why this matters for you:
 
 If anything fails, I’ll fix the tests or code and re-run until everything is green.
 
+
+
+## What I did (Playwright E2E setup and run)
+
+- Installed Playwright test runner and browsers
+  - Why: End-to-end tests exercise the real app in a browser to catch integration issues
+  - Commands I ran: `npm i -D @playwright/test` and `npx playwright install`
+- Added Playwright configuration
+  - File: `playwright.config.ts` with a webServer that `npm run build && npm run start` on port 3000
+  - Why: This boots the real app for tests automatically
+- Wrote a first E2E test
+  - File: `tests/e2e/home.spec.ts`
+  - What it checks: Home renders unauthenticated state and the "Try Demo Mode" button navigates to `/demo`, which shows the demo table
+- Fixed build-time issues surfaced by E2E run
+  - Evidence API create: aligned fields with Prisma schema (use `summary`, remove unsupported `content`/`kind`)
+  - test setup: replaced `@ts-expect-error` with a safe `globalThis.ResizeObserver` assignment
+  - tsconfig: excluded test files and `vitest.config.ts` from Next.js build to avoid type errors during production build
+- Added npm scripts
+  - `npm run test:e2e` → runs Playwright tests
+  - `npm run test:e2e:ui` → opens Playwright UI
+- Ran the suite and verified
+  - Command: `npx playwright test`
+  - Result: 3 passed (Chromium, Firefox, WebKit)
+
+Beginner note: E2E tests launch a real browser, open your app, click buttons/links, and assert what the user would see. If the app fails to build, Playwright reports it early—which helped us find and fix a couple of small mismatches (like Evidence fields) before the tests ran.

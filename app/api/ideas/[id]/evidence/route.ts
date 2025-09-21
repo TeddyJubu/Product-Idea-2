@@ -50,9 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const evidence = await prisma.evidence.create({ data: {
       ideaId: id,
       title: data.title,
-      url: data.url ?? undefined,
-      content: data.content ?? undefined,
-      kind: data.kind ?? "NOTE",
+      summary: data.summary ?? undefined,
+      url: data.url ? data.url : undefined,
     }});
     return NextResponse.json({ evidence }, { status: 201 });
   } catch (error) {
